@@ -6,7 +6,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const HOOK = path.join(path.dirname(fileURLToPath(import.meta.url)), '../skills/project-docs/assets/docs-sync.cjs');
+const HOOK = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/andy-init/skills/project-docs/assets/docs-sync.cjs');
 
 function git(cwd, ...args) {
   execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], { cwd, stdio: 'ignore' });

@@ -12,7 +12,7 @@ import {
   apply,
   plan,
   upsertBlock,
-} from '../skills/setup/scripts/setup.mjs';
+} from '../plugins/andy-init/skills/setup/scripts/setup.mjs';
 
 function tmpRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'andy-init-'));
@@ -34,7 +34,7 @@ test('首次安裝：建立 AGENTS.md、rules、CLAUDE.md 區塊、偏好檔、s
   assert.ok(kinds(result, 'add').includes('AGENTS.md'));
   assert.match(read(root, 'AGENTS.md'), /AGENTS\.md` 是規則本體/);
   assert.ok(fs.existsSync(path.join(root, 'rules/python/coding-style.md')));
-  assert.ok(!fs.existsSync(path.join(root, 'rules/README.md')), 'rules/README.md 不應安裝');
+  assert.ok(!fs.existsSync(path.join(root, 'rules/README.md')), '說明檔不應被當成 rule 安裝');
   assert.match(read(root, 'CLAUDE.md'), /@~\/\.claude\/AGENTS\.md/);
   assert.ok(fs.existsSync(path.join(root, 'project-docs.preferences.md')));
   assert.equal(JSON.parse(read(root, 'settings.json')).language, '繁體中文');

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { COMMAND, HOOK_REL, STATE_REL, install, withHook } from '../skills/project-docs/assets/install-hook.mjs';
+import { COMMAND, HOOK_REL, STATE_REL, install, withHook } from '../plugins/andy-init/skills/project-docs/assets/install-hook.mjs';
 
 function project(files = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'install-hook-'));

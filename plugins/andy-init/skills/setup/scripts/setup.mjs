@@ -24,8 +24,8 @@ export const BLOCK_END = '<!-- andy-init:END -->';
 // json-merge= 合併進既有 JSON
 export const ITEMS = [
   { src: 'AGENTS.md', dest: 'AGENTS.md', mode: 'managed' },
-  // rules/README.md 不安裝：~/.claude/rules 下的 .md 都會被當成 rule 載入，說明檔只會白佔 context。
-  { src: 'rules', dest: 'rules', mode: 'managed', exclude: ['README.md'] },
+  // payload/rules 裡只能放 rule 本身：~/.claude/rules 下的每個 .md 都會被載入，來源說明放 tools/UPSTREAM.md。
+  { src: 'rules', dest: 'rules', mode: 'managed' },
   { src: 'claude-md.block.md', dest: 'CLAUDE.md', mode: 'block' },
   { src: 'project-docs.preferences.md', dest: 'project-docs.preferences.md', mode: 'seed-once' },
   { src: 'settings.patch.json', dest: 'settings.json', mode: 'json-merge' },
@@ -63,9 +63,7 @@ function listFiles(dir, base = dir) {
 export function expandManaged(item, payloadDir) {
   const src = path.join(payloadDir, item.src);
   if (fs.statSync(src).isFile()) return [{ src, key: item.dest }];
-  const exclude = new Set(item.exclude || []);
   return listFiles(src)
-    .filter((rel) => !exclude.has(toKey(rel)))
     .sort()
     .map((rel) => ({ src: path.join(src, rel), key: toKey(path.join(item.dest, rel)) }));
 }

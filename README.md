@@ -36,7 +36,8 @@ claude plugin update andy-init@andy-claude-kit
 |---|---|---|
 | 工程習慣 | `~/.claude/AGENTS.md` | 跨專案硬規則本體 |
 | import 殼 | `~/.claude/CLAUDE.md` 受管區塊 | 只有 `@~/.claude/AGENTS.md`；區塊外內容不動 |
-| 語言 rules | `~/.claude/rules/{python,typescript,golang,rust,vue,web}/` | 擷取自上游 ECC，依副檔名自動載入；來源與差異見 `plugins/andy-init/skills/setup/payload/rules/README.md` |
+| 語言 rules | `~/.claude/rules/{python,typescript,golang,rust,vue,web}/` | 擷取自上游 ECC，依副檔名自動載入；來源與差異見 `tools/UPSTREAM.md` |
+| 審查 agents | plugin 直接提供 | `andy-init:python-reviewer`、`typescript-reviewer`、`go-reviewer`、`rust-reviewer`、`database-reviewer`、`security-reviewer`；全部唯讀，只回報不改檔 |
 | 語言設定 | `~/.claude/settings.json` 的 `language` | 繁體中文 |
 | project-docs 偏好 | `~/.claude/project-docs.preferences.md` | 只在不存在時建立 |
 | LSP、claude-hud | Claude Code plugin | setup 時選裝 |
@@ -49,8 +50,8 @@ setup 會在 `~/.claude/andy-init.manifest.json` 記錄每個受管檔的 hash�
 ```bash
 claude --plugin-dir ./plugins/andy-init        # 不安裝，直接載入本機版本測試
 claude plugin validate .                       # 檢查 marketplace 與 plugin 格式
-node --test "plugins/andy-init/tests/*.test.mjs"
-node tools/sync-rules.mjs                      # 從上游抓最新語言 rules，看 git diff 決定要不要收
+node --test "tests/*.test.mjs"
+node tools/sync-upstream.mjs                   # 從上游抓最新 rules 與 agents，看 git diff 決定要不要收
 ```
 
 ### 發版
@@ -62,5 +63,6 @@ node tools/sync-rules.mjs                      # 從上游抓最新語言 rules�
 ### 擴充
 
 - 新 skill：`plugins/andy-init/skills/<name>/SKILL.md`
+- 新的上游 agent：加進 `tools/sync-upstream.mjs` 的 `AGENTS` 清單後重跑（必須是唯讀）
 - 新的全域檔案：放進 `skills/setup/payload/`，在 `setup.mjs` 的 `ITEMS` 加一行
 - 用途完全不同的東西：新開 `plugins/<name>/`，並在 `.claude-plugin/marketplace.json` 加一筆
