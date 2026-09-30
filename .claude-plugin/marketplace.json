@@ -1,0 +1,14 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "andy-claude-kit",
+  "description": "Andy 的私人 Claude Code plugin 集",
+  "owner": { "name": "Andy880828" },
+  "plugins": [
+    {
+      "name": "andy-init",
+      "source": "./plugins/andy-init",
+      "description": "環境初始化：全域 AGENTS.md、語言 rules、LSP 選裝、project-docs 與文件同步 hook",
+      "category": "productivity"
+    }
+  ]
+}

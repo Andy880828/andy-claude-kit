@@ -1,0 +1,9 @@
+{
+  "name": "andy-init",
+  "version": "0.1.0",
+  "description": "Andy 的 Claude Code 環境初始化：全域 AGENTS.md（工程習慣）、語言 rules、繁體中文設定、LSP 選裝，以及 project-docs 文件骨幹與自動同步 hook。",
+  "author": { "name": "Andy880828" },
+  "repository": "https://github.com/Andy880828/andy-claude-kit",
+  "license": "UNLICENSED",
+  "keywords": ["init", "dotfiles", "rules", "project-docs"]
+}

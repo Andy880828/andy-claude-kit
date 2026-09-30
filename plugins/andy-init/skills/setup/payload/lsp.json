@@ -1,0 +1,93 @@
+{
+  "marketplace": "claude-plugins-official",
+  "note": "每一項對應官方 marketplace 的 <plugin>；binary 是該 plugin 的 lspServers.command，必須在 PATH 上 plugin 才有作用。",
+  "groups": [
+    {
+      "id": "stack",
+      "label": "你的技術棧",
+      "items": [
+        {
+          "plugin": "typescript-lsp",
+          "languages": "TypeScript / JavaScript（含 .vue 以外的 TS/JS）",
+          "binary": "typescript-language-server",
+          "install": { "all": "npm i -g typescript typescript-language-server" }
+        },
+        {
+          "plugin": "pyright-lsp",
+          "languages": "Python",
+          "binary": "pyright-langserver",
+          "install": { "all": "npm i -g pyright" }
+        },
+        {
+          "plugin": "gopls-lsp",
+          "languages": "Go",
+          "binary": "gopls",
+          "install": { "all": "go install golang.org/x/tools/gopls@latest" }
+        },
+        {
+          "plugin": "rust-analyzer-lsp",
+          "languages": "Rust",
+          "binary": "rust-analyzer",
+          "install": { "all": "rustup component add rust-analyzer" }
+        }
+      ]
+    },
+    {
+      "id": "other",
+      "label": "其他語言",
+      "items": [
+        {
+          "plugin": "clangd-lsp",
+          "languages": "C / C++",
+          "binary": "clangd",
+          "install": { "win32": "winget install LLVM.LLVM", "darwin": "brew install llvm", "linux": "sudo apt install clangd" }
+        },
+        {
+          "plugin": "csharp-lsp",
+          "languages": "C#",
+          "binary": "csharp-ls",
+          "install": { "all": "dotnet tool install --global csharp-ls" }
+        },
+        {
+          "plugin": "jdtls-lsp",
+          "languages": "Java",
+          "binary": "jdtls",
+          "install": { "darwin": "brew install jdtls", "all": "見 https://github.com/eclipse-jdtls/eclipse.jdt.ls#installation" }
+        },
+        {
+          "plugin": "kotlin-lsp",
+          "languages": "Kotlin",
+          "binary": "kotlin-lsp",
+          "install": { "darwin": "brew install JetBrains/utils/kotlin-lsp", "all": "見 https://github.com/Kotlin/kotlin-lsp" }
+        },
+        {
+          "plugin": "lua-lsp",
+          "languages": "Lua",
+          "binary": "lua-language-server",
+          "install": { "win32": "winget install LuaLS.lua-language-server", "darwin": "brew install lua-language-server", "linux": "sudo snap install lua-language-server --classic" }
+        },
+        {
+          "plugin": "php-lsp",
+          "languages": "PHP",
+          "binary": "intelephense",
+          "install": { "all": "npm i -g intelephense" }
+        },
+        {
+          "plugin": "ruby-lsp",
+          "languages": "Ruby",
+          "binary": "ruby-lsp",
+          "install": { "all": "gem install ruby-lsp" }
+        },
+        {
+          "plugin": "swift-lsp",
+          "languages": "Swift",
+          "binary": "sourcekit-lsp",
+          "install": { "darwin": "隨 Xcode / Swift toolchain 安裝", "all": "安裝 Swift toolchain：https://www.swift.org/install" }
+        }
+      ]
+    }
+  ],
+  "knownGaps": [
+    "Vue SFC（.vue）：官方 marketplace 沒有 Vue LSP，.vue 檔不會有 LSP 診斷"
+  ]
+}
