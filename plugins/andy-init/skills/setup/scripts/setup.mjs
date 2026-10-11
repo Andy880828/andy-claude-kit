@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // andy-init 全域環境安裝：把 payload 寫進 ~/.claude（或 CLAUDE_CONFIG_DIR）。
-// 用法：node setup.mjs [--dry-run] [--force] | node setup.mjs --check-lsp
+// 用法：node setup.mjs [--dry-run] [--force] [--subagent-mode=investigate|implement] | node setup.mjs --check-lsp
 // 冪等：重跑只會動「andy-init 上次寫入後沒被手改過」的檔案；手改過的檔案跳過，--force 才會先備份再覆蓋。
 
 import crypto from 'node:crypto';
@@ -16,6 +16,19 @@ const PLUGIN_JSON = path.join(SCRIPT_DIR, '..', '..', '..', '.claude-plugin', 'p
 export const MANIFEST_NAME = 'andy-init.manifest.json';
 export const BLOCK_START = '<!-- andy-init:START -->';
 export const BLOCK_END = '<!-- andy-init:END -->';
+
+// 可選的規則變體。payload 裡以 `<!-- andy-init:option <name>=<value> -->` … `<!-- andy-init:end-option -->`
+// 包住各變體，寫入前只保留選中的那一個。選擇記在 manifest 的 `options`，重跑不帶參數就沿用上次的選擇。
+// 新增選項 = 這裡加一筆 + payload 加變體 + 測試兩種渲染結果（沒有讀取點的選項是假旋鈕）。
+export const OPTIONS = {
+  'subagent-mode': {
+    values: ['investigate', 'implement'],
+    default: 'investigate',
+    label: '子 agent 只調查（investigate）或可實作、由主線驗收（implement）',
+  },
+};
+const OPTION_START = /^<!-- andy-init:option ([a-z-]+)=([a-z-]+) -->$/;
+const OPTION_END = '<!-- andy-init:end-option -->';
 
 // 宣告式清單：擴充全域檔案只改這裡。
 // managed   = 完整受管（依 manifest 判斷能否覆蓋）
@@ -68,6 +81,50 @@ export function expandManaged(item, payloadDir) {
     .map((rel) => ({ src: path.join(src, rel), key: toKey(path.join(item.dest, rel)) }));
 }
 
+/** 合併選項：明確指定 > manifest 記錄 > 預設；值不合法直接拋錯（不猜）。 */
+export function resolveOptions(explicit = {}, recorded = {}) {
+  for (const name of Object.keys(explicit)) {
+    if (!(name in OPTIONS)) throw new Error(`未知選項：${name}`);
+  }
+  const out = {};
+  for (const [name, spec] of Object.entries(OPTIONS)) {
+    const value = explicit[name] ?? recorded[name] ?? spec.default;
+    if (!spec.values.includes(value)) {
+      throw new Error(`選項 ${name} 的值 ${value} 不合法，可用：${spec.values.join('、')}`);
+    }
+    out[name] = value;
+  }
+  return out;
+}
+
+/** 只保留選中的變體，標記行一併移除。標記不成對或引用未知選項時拋錯，不寫半套。 */
+export function renderOptions(text, options) {
+  // 兩種標記都沒有才提早返回——只看開始標記會讓孤立的結束標記被原樣寫出去
+  if (!text.includes('<!-- andy-init:option') && !text.includes(OPTION_END)) return text;
+  const out = [];
+  let current = null;
+  for (const line of text.split('\n')) {
+    const start = line.match(OPTION_START);
+    if (start) {
+      if (current) throw new Error(`andy-init:option 區塊巢狀：${line}`);
+      const [, name, value] = start;
+      if (!(name in OPTIONS) || !OPTIONS[name].values.includes(value)) {
+        throw new Error(`payload 引用了未知選項 ${name}=${value}`);
+      }
+      current = { keep: options[name] === value };
+      continue;
+    }
+    if (line === OPTION_END) {
+      if (!current) throw new Error('andy-init:end-option 沒有對應的開始標記');
+      current = null;
+      continue;
+    }
+    if (!current || current.keep) out.push(line);
+  }
+  if (current) throw new Error('andy-init:option 區塊沒有結束標記');
+  return out.join('\n');
+}
+
 /** 在既有 CLAUDE.md 內容中插入或替換受管區塊，區塊外原樣保留。 */
 export function upsertBlock(existing, inner) {
   const block = `${BLOCK_START}\n${inner.trimEnd()}\n${BLOCK_END}`;
@@ -99,7 +156,9 @@ function planManaged(item, ctx) {
   const seen = new Set(files.map((f) => f.key));
 
   for (const { src, key } of files) {
-    const next = fs.readFileSync(src);
+    const next = src.endsWith('.md')
+      ? Buffer.from(renderOptions(fs.readFileSync(src, 'utf8'), ctx.options))
+      : fs.readFileSync(src);
     const dest = path.join(ctx.root, key);
     const cur = readIfExists(dest);
     const recorded = ctx.manifest.files[key];
@@ -175,17 +234,18 @@ function strayRuleWarnings(ctx, managedKeys) {
 
 const PLANNERS = { managed: planManaged, block: planBlock, 'seed-once': planSeedOnce, 'json-merge': planJsonMerge };
 
-export function plan({ root, payloadDir = PAYLOAD_DIR, force = false }) {
+export function plan({ root, payloadDir = PAYLOAD_DIR, force = false, options: explicit = {} }) {
   const manifestPath = path.join(root, MANIFEST_NAME);
-  let manifest = { version: null, files: {} };
+  let manifest = { version: null, files: {}, options: {} };
   if (fs.existsSync(manifestPath)) {
     const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    manifest = { ...manifest, ...parsed, files: parsed.files ?? {} };
+    manifest = { ...manifest, ...parsed, files: parsed.files ?? {}, options: parsed.options ?? {} };
   }
-  const ctx = { root, payloadDir, force, manifest };
+  const options = resolveOptions(explicit, manifest.options);
+  const ctx = { root, payloadDir, force, manifest, options };
   const actions = ITEMS.flatMap((item) => PLANNERS[item.mode](item, ctx));
   const managedKeys = new Set(actions.filter((a) => !a.untracked && a.kind !== 'remove').map((a) => a.key));
-  return { actions, manifest, manifestPath, warnings: strayRuleWarnings(ctx, managedKeys) };
+  return { actions, manifest, manifestPath, options, warnings: strayRuleWarnings(ctx, managedKeys) };
 }
 
 function timestamp() {
@@ -214,7 +274,7 @@ function writeAtomic(dest, content) {
   fs.renameSync(tmp, real);
 }
 
-export function apply({ actions, manifest, manifestPath }, version) {
+export function apply({ actions, manifest, manifestPath, options }, version) {
   const files = { ...manifest.files };
   const stamp = timestamp();
   for (const a of actions) {
@@ -225,13 +285,16 @@ export function apply({ actions, manifest, manifestPath }, version) {
     if (a.kind === 'remove') delete files[a.key];
     else if (a.content && a.kind !== 'skip') files[a.key] = sha256(a.content);
   }
-  writeAtomic(manifestPath, JSON.stringify({ version, updatedAt: new Date().toISOString(), files }, null, 2) + '\n');
+  const record = { version, updatedAt: new Date().toISOString(), options: options ?? manifest.options ?? {}, files };
+  writeAtomic(manifestPath, JSON.stringify(record, null, 2) + '\n');
 }
 
 const LABELS = { add: '新增', update: '更新', remove: '移除', skip: '跳過', error: '錯誤', same: '未變更' };
 
-export function formatReport(actions, warnings, { dryRun }) {
+export function formatReport(actions, warnings, { dryRun, options = {} }) {
   const lines = [dryRun ? '【預覽，尚未寫入任何檔案】' : '【已套用】'];
+  const chosen = Object.entries(options).map(([k, v]) => `${k}=${v}`);
+  if (chosen.length) lines.push(`選項：${chosen.join('、')}`);
   for (const kind of ['add', 'update', 'remove', 'skip', 'error']) {
     const list = actions.filter((a) => a.kind === kind);
     if (!list.length) continue;
@@ -302,9 +365,21 @@ function readVersion() {
   return JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8')).version;
 }
 
+/** 解析 `--<選項名>=<值>`；選項名不在 OPTIONS 內的不收（留給未知參數檢查報錯）。 */
+export function parseOptionArgs(argv) {
+  const options = {};
+  for (const arg of argv) {
+    const m = arg.match(/^--([a-z-]+)=(.*)$/);
+    if (m && m[1] in OPTIONS) options[m[1]] = m[2];
+  }
+  return options;
+}
+
 function main(argv) {
   const known = new Set(['--dry-run', '--force', '--check-lsp']);
-  const bad = argv.filter((a) => !known.has(a));
+  const optionArgs = parseOptionArgs(argv);
+  const isOption = (a) => Object.keys(optionArgs).some((k) => a.startsWith(`--${k}=`));
+  const bad = argv.filter((a) => !known.has(a) && !isOption(a));
   if (bad.length) throw new Error(`未知參數：${bad.join(' ')}`);
   const root = resolveRoot();
 
@@ -313,11 +388,11 @@ function main(argv) {
     return 0;
   }
   const dryRun = argv.includes('--dry-run');
-  const result = plan({ root, force: argv.includes('--force') });
+  const result = plan({ root, force: argv.includes('--force'), options: optionArgs });
   const hasError = result.actions.some((a) => a.kind === 'error');
   if (!dryRun && !hasError) apply(result, readVersion());
   console.log(`目標：${root}`);
-  console.log(formatReport(result.actions, result.warnings, { dryRun: dryRun || hasError }));
+  console.log(formatReport(result.actions, result.warnings, { dryRun: dryRun || hasError, options: result.options }));
   if (hasError) console.log('有錯誤，整批未寫入。修正後重跑。');
   return hasError ? 1 : 0;
 }

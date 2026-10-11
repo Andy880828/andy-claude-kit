@@ -1,7 +1,7 @@
 ---
 name: setup
 description: 初始化或更新這台電腦的 Claude Code 全域環境——安裝全域 AGENTS.md（工程習慣）、CLAUDE.md 的 import 殼、語言 rules（Python/TS/JS/Go/Rust/Vue/Web）、繁體中文語言設定、project-docs 偏好檔，並選裝 LSP 與 claude-hud。Use when the user says 初始化環境、setup、新電腦、重裝 Claude、更新 andy-init、同步全域設定.
-argument-hint: "[--force]"
+argument-hint: "[--force] [--subagent-mode=investigate|implement]"
 disable-model-invocation: true
 allowed-tools: Read AskUserQuestion Bash(node *) Bash(claude plugin *)
 ---
@@ -13,10 +13,16 @@ allowed-tools: Read AskUserQuestion Bash(node *) Bash(claude plugin *)
 
 下文的 `<SKILL_DIR>` 指本 skill 的 base directory（載入時會告訴你）。
 
-## 1. 預覽 → 確認 → 套用
+## 1. 選項 → 預覽 → 確認 → 套用
+
+先用一次 `AskUserQuestion` 問可選的規則變體（目前只有一個；預覽報告第二行「選項：」會顯示目前的選擇）：
+
+- `subagent-mode`：子 agent 只負責調查（`investigate`，預設），或可實作邊界清楚的工作包、最終驗證與 commit 留在主線（`implement`）
+
+使用者的選擇以 `--subagent-mode=<值>` 帶給下面兩個指令；不想改就不帶（沿用 manifest 記的值）。
 
 ```bash
-node "<SKILL_DIR>/scripts/setup.mjs" --dry-run
+node "<SKILL_DIR>/scripts/setup.mjs" --dry-run [--subagent-mode=<值>]
 ```
 
 把報告**原樣**給使用者看，特別指出：
@@ -30,7 +36,7 @@ node "<SKILL_DIR>/scripts/setup.mjs" --dry-run
 使用者同意後執行（有 `$ARGUMENTS` 就照帶）：
 
 ```bash
-node "<SKILL_DIR>/scripts/setup.mjs" $ARGUMENTS
+node "<SKILL_DIR>/scripts/setup.mjs" $ARGUMENTS [--subagent-mode=<值>]
 ```
 
 ## 2. LSP（可選）

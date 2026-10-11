@@ -1,6 +1,6 @@
 {
   "name": "andy-init",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Andy 的 Claude Code 環境初始化：全域 AGENTS.md（工程習慣）、語言 rules、繁體中文設定、LSP 選裝、唯讀語言審查 agents，以及 project-docs 文件骨幹與自動同步 hook。",
   "author": {
     "name": "Andy880828"

@@ -102,5 +102,12 @@
 
 - Context 是有限的工程資源。策略是**精準搜尋 → 精準讀取 → 局部修改 → 機械驗證**，不要為了方便把整個 repo 讀進 context。
 - 本機若有這些工具優先使用：`rg`（全文）、`fd`（檔名）、`sg`／ast-grep（AST，精確找定義並排除字串與註解噪訊）、`jq`（大型 JSON，避免整包 lock 檔進 context）、Playwright CLI、`git`。
+<!-- andy-init:option subagent-mode=investigate -->
 - 子 agent 負責「**搞清楚**」（掃描 repo、找依賴、定位 root cause、比較既有實作、提供證據），不負責「動手」。實作與最終驗證留在主線，因為證據要留在主線的紀錄裡。
+<!-- andy-init:end-option -->
+<!-- andy-init:option subagent-mode=implement -->
+- 子 agent 可以**實作**，但只接**邊界清楚的工作包**：主線先寫明範圍（可改與不可改的檔案、驗收指令、禁止事項），子 agent 回報改了哪些檔、跑了哪些檢查與原始輸出。
+- **最終驗證與 commit 留在主線**：主線重跑 baseline 比差額、守門測試與探針、端到端驗證——證據要留在主線的紀錄裡。子 agent 的「完成」只是待驗證的報告（第 1 條：報告不是事實）。
+- 同一個工作樹同時只讓一個子 agent 寫檔；要平行就切成檔案不重疊的工作包。審查類子 agent 一律唯讀。
+<!-- andy-init:end-option -->
 - 不可逆操作：預設只盤點、要二次確認、確認形式是**重述具體名稱**而不是 yes/no、不能被排程、動作前先留紀錄。可逆性決定嚴格度。

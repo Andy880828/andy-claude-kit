@@ -45,6 +45,15 @@ claude plugin update andy-init@andy-claude-kit
 
 setup 會在 `~/.claude/andy-init.manifest.json` 記錄每個受管檔的 hash：你手改過的檔案之後不會被覆蓋（`--force` 才會，且先備份）。
 
+### 可選的規則變體
+
+| 選項 | 值 | 效果 |
+|---|---|---|
+| `--subagent-mode` | `investigate`（預設） | 全域 AGENTS.md §13：子 agent 只負責調查，實作與驗證留在主線 |
+| | `implement` | 子 agent 可實作邊界清楚的工作包；最終驗證與 commit 仍留在主線，同一工作樹一次只讓一個子 agent 寫檔 |
+
+選擇記在 manifest 的 `options`，之後不帶參數重跑會沿用；手改過的 `AGENTS.md` 切換選項時同樣會被跳過。
+
 ## 開發
 
 ```bash

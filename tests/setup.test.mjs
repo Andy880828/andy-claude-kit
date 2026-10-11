@@ -10,7 +10,9 @@ import {
   BLOCK_START,
   MANIFEST_NAME,
   apply,
+  parseOptionArgs,
   plan,
+  renderOptions,
   upsertBlock,
 } from '../plugins/andy-init/skills/setup/scripts/setup.mjs';
 
@@ -167,4 +169,73 @@ test('rules 目錄裡非受管的 .md 會被列為警告', () => {
   fs.writeFileSync(path.join(root, 'rules/python/hooks.md'), 'ECC 舊檔\n');
   const result = run(root);
   assert.ok(result.warnings.some((w) => w.includes('rules/python/hooks.md')));
+});
+
+// ---- 可選規則變體（subagent-mode） ----
+
+const INVESTIGATE = /子 agent 負責「\*\*搞清楚\*\*」/;
+const IMPLEMENT = /子 agent 可以\*\*實作\*\*/;
+
+test('subagent-mode 預設 investigate：只留調查版，標記行不寫出', () => {
+  const root = tmpRoot();
+  run(root);
+  const text = read(root, 'AGENTS.md');
+  assert.match(text, INVESTIGATE);
+  assert.doesNotMatch(text, IMPLEMENT);
+  assert.doesNotMatch(text, /andy-init:(option|end-option)/);
+});
+
+test('subagent-mode=implement：只留實作版，並記在 manifest', () => {
+  const root = tmpRoot();
+  run(root, { options: { 'subagent-mode': 'implement' } });
+  const text = read(root, 'AGENTS.md');
+  assert.match(text, IMPLEMENT);
+  assert.doesNotMatch(text, INVESTIGATE);
+  assert.equal(JSON.parse(read(root, MANIFEST_NAME)).options['subagent-mode'], 'implement');
+});
+
+test('重跑不帶選項：沿用 manifest 記的選擇，全部未變更', () => {
+  const root = tmpRoot();
+  run(root, { options: { 'subagent-mode': 'implement' } });
+  const second = run(root);
+  assert.equal(second.options['subagent-mode'], 'implement');
+  assert.deepEqual(second.actions.filter((a) => !['same', 'skip'].includes(a.kind)), []);
+});
+
+test('切換選項：沒手改過的 AGENTS.md 會更新成另一個變體', () => {
+  const root = tmpRoot();
+  run(root);
+  const switched = run(root, { options: { 'subagent-mode': 'implement' } });
+  assert.ok(kinds(switched, 'update').includes('AGENTS.md'));
+  assert.match(read(root, 'AGENTS.md'), IMPLEMENT);
+});
+
+test('切換選項：手改過的 AGENTS.md 照樣跳過（選項不能繞過手改保護）', () => {
+  const root = tmpRoot();
+  run(root);
+  fs.appendFileSync(path.join(root, 'AGENTS.md'), '\n我自己加的\n');
+  const switched = run(root, { options: { 'subagent-mode': 'implement' } });
+  assert.ok(kinds(switched, 'skip').includes('AGENTS.md'));
+  assert.match(read(root, 'AGENTS.md'), INVESTIGATE);
+});
+
+test('選項值不合法、未知選項：直接拋錯，不寫任何檔', () => {
+  const root = tmpRoot();
+  assert.throws(() => plan({ root, options: { 'subagent-mode': 'yolo' } }), /不合法/);
+  assert.throws(() => plan({ root, options: { 'no-such-option': 'x' } }), /未知選項/);
+  assert.ok(!fs.existsSync(path.join(root, 'AGENTS.md')));
+});
+
+test('renderOptions：標記不成對或引用未知選項時拋錯', () => {
+  const opts = { 'subagent-mode': 'investigate' };
+  assert.throws(() => renderOptions('<!-- andy-init:option subagent-mode=investigate -->\nx', opts), /結束標記/);
+  assert.throws(() => renderOptions('x\n<!-- andy-init:end-option -->', opts), /開始標記/);
+  assert.throws(() => renderOptions('<!-- andy-init:option nope=a -->\nx\n<!-- andy-init:end-option -->', opts), /未知選項/);
+  assert.equal(renderOptions('沒有標記\n', opts), '沒有標記\n');
+});
+
+test('parseOptionArgs：只收 OPTIONS 裡的 --名稱=值', () => {
+  assert.deepEqual(parseOptionArgs(['--dry-run', '--subagent-mode=implement', '--foo=bar']), {
+    'subagent-mode': 'implement',
+  });
 });

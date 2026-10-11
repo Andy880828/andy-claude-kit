@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 
 export const UPSTREAM_URL = 'https://github.com/affaan-m/ECC';
 export const LANGS = ['python', 'typescript', 'golang', 'rust', 'vue', 'web'];
-// 只帶唯讀審查者：AGENTS.md §13「子 agent 負責搞清楚，不負責動手」。
+// 只帶唯讀審查者：審查者的價值在獨立——能改檔的審查者會順手修掉它該回報的問題。
+// 與 AGENTS.md §13 的 subagent-mode 無關：即使選 implement，審查類子 agent 也一律唯讀。
 export const AGENTS = [
   'python-reviewer',
   'typescript-reviewer',

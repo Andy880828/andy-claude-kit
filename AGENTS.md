@@ -7,7 +7,8 @@
 
 - 版本號只寫在 `plugins/andy-init/.claude-plugin/plugin.json`；`marketplace.json` 的 plugin 條目**不寫 version**。
 - `skills/setup/payload/rules/` 與 `plugins/andy-init/agents/` 由 `tools/sync-upstream.mjs` 產生，**不要手改**；要調整擷取方式就改腳本再重跑，來源紀錄在 `tools/UPSTREAM.md`。
-- agents 只收唯讀審查者（Read/Grep/Glob/Bash）；有 Write/Edit 的違反全域 AGENTS.md §13，腳本會直接拒絕。
+- agents 只收唯讀審查者（Read/Grep/Glob/Bash）；有 Write/Edit 的腳本會直接拒絕。這與全域 §13 的 `subagent-mode` 選項無關——選 `implement` 時審查類子 agent 也一律唯讀。
+- payload 的可選變體以 `<!-- andy-init:option <名稱>=<值> -->` … `<!-- andy-init:end-option -->` 包住，選項表在 `setup.mjs` 的 `OPTIONS`；新增選項要同時加兩種渲染結果的測試（沒有讀取點的選項是假旋鈕）。
 - `plugins/andy-init/` 只放要發佈的東西（整個目錄會被複製進每台電腦的 plugin 快取）；測試、工具、說明放 repo 根目錄。
 - `~/.claude` 底下的檔案一律經 `setup.mjs` 寫入；新增全域檔案 = payload 加檔 + `ITEMS` 加一行。
 - 改 `docs-sync.cjs` 行為時，同步升它檔頭的 `// docs-sync vX.Y.Z`，否則已安裝的專案 audit 時不會更新。
