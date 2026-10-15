@@ -73,12 +73,92 @@ test('改程式 → 擋下，reason 列出檔案與要檢查的文件', () => {
   assert.match(r.reason, /docs\/PROGRESS\.md/);
 });
 
-test('同一批變更只擋一次；內容再變就再擋', () => {
+/** 把上次擋下的時間改到冷卻期之外，模擬「5 分鐘後」。 */
+function expireCooldown(dir, msAgo = 6 * 60 * 1000) {
+  const file = path.join(dir, '.claude/.docs-sync-state.json');
+  const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+  state.blockedAt = new Date(Date.now() - msAgo).toISOString();
+  fs.writeFileSync(file, JSON.stringify(state));
+}
+
+test('同一批檔案只擋一次：內容再變也不重擋', () => {
   const dir = repo();
   write(dir, 'src/app.py', 'print(2)\n');
   assert.equal(stop(dir).block, true);
   assert.equal(stop(dir).block, false);
   write(dir, 'src/app.py', 'print(3)\n');
+  expireCooldown(dir);
+  assert.equal(stop(dir).block, false);
+});
+
+test('出現新路徑才再擋，且冷卻 5 分鐘內不擋；冷卻後補擋不漏', () => {
+  const dir = repo();
+  write(dir, 'src/app.py', 'print(2)\n');
+  assert.equal(stop(dir).block, true);
+  write(dir, 'src/new.py', 'x = 1\n');
+  assert.equal(stop(dir).block, false, '冷卻中');
+  expireCooldown(dir, 4 * 60 * 1000);
+  assert.equal(stop(dir).block, false, '4 分鐘仍在冷卻中');
+  expireCooldown(dir);
+  const r = stop(dir);
+  assert.equal(r.block, true);
+  assert.match(r.reason, /src\/new\.py/);
+});
+
+test('冷卻期間 commit 的新檔案，冷卻後仍會被擋（head 不在冷卻中推進）', () => {
+  const dir = repo();
+  write(dir, 'src/app.py', 'print(2)\n');
+  assert.equal(stop(dir).block, true);
+  git(dir, 'commit', '-qam', 'app');
+  write(dir, 'src/late.py', 'z = 1\n');
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'late');
+  assert.equal(stop(dir).block, false, '冷卻中');
+  expireCooldown(dir);
+  const r = stop(dir);
+  assert.equal(r.block, true);
+  assert.match(r.reason, /src\/late\.py/);
+});
+
+test('擋過的一批部分 commit 後（集合變小）不重擋', () => {
+  const dir = repo();
+  assert.equal(stop(dir).block, false);
+  write(dir, 'src/app.py', 'print(2)\n');
+  write(dir, 'src/b.py', 'b = 1\n');
+  assert.equal(stop(dir).block, true);
+  git(dir, 'commit', '-qm', 'app only', '--', 'src/app.py');
+  expireCooldown(dir);
+  assert.equal(stop(dir).block, false);
+  assert.equal(stop(dir).block, false, 'head 推進後只剩 src/b.py，仍是擋過的');
+});
+
+test('工作區乾淨後清空紀錄：同一檔案下一批再改會再擋', () => {
+  const dir = repo();
+  assert.equal(stop(dir).block, false);
+  write(dir, 'src/app.py', 'print(2)\n');
+  assert.equal(stop(dir).block, true);
+  git(dir, 'commit', '-qam', 'change');
+  assert.equal(stop(dir).block, false);
+  assert.equal(stop(dir).block, false); // 這次 changed 為空 → 清空 paths
+  write(dir, 'src/app.py', 'print(3)\n');
+  assert.equal(stop(dir).block, false, '冷卻照算');
+  expireCooldown(dir);
+  assert.equal(stop(dir).block, true);
+});
+
+test('blockedAt 在未來（時鐘倒退）不當成冷卻中', () => {
+  const dir = repo();
+  write(dir, 'src/app.py', 'print(2)\n');
+  assert.equal(stop(dir).block, true);
+  write(dir, 'src/new.py', 'x = 1\n');
+  expireCooldown(dir, -60 * 60 * 1000);
+  assert.equal(stop(dir).block, true);
+});
+
+test('v1.1 舊 state（只有 fingerprint）→ 視為沒擋過，擋一次', () => {
+  const dir = repo();
+  write(dir, 'src/app.py', 'print(2)\n');
+  write(dir, '.claude/.docs-sync-state.json', JSON.stringify({ fingerprint: 'abc', blockedAt: '2020-01-01T00:00:00Z' }));
   assert.equal(stop(dir).block, true);
 });
 

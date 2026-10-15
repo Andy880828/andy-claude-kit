@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// docs-sync v1.1.0 (andy-init)
+// docs-sync v1.2.0 (andy-init)
 // Claude Code Stop hook：本輪有「程式變更」就擋下一次，要求依 project-docs 的更新時機表同步文件。
 // 由 /andy-init:project-docs 複製進專案；要改行為請改 andy-claude-kit 裡的原檔再 audit，不要只改這份。
 //
@@ -7,19 +7,20 @@
 // - stop_hook_active 為 true（本來就是因為被擋而繼續）→ 放行，避免無限迴圈
 // - 非 git repo、git 失敗 → 放行（錯誤寫 stderr；hook 故障不能卡住 session）
 // - 程式變更 = 工作區變更 + 上次記錄的 HEAD 之後的 commit，排除 docs/**、根目錄 *.md、.claude/**
-// - 同一批變更（路徑＋內容指紋相同）只擋一次
+// - 只有出現「還沒擋過的路徑」才擋；同一批檔案內容再改不會重擋（v1.2.0 前看內容指紋，
+//   長 session 裡每改一個字就重擋一次，每次都要把整段 context 重讀一輪）。工作區乾淨後清空紀錄
+// - 上次擋下後 5 分鐘內不再擋（冷卻期間不寫 state，新路徑留到冷卻後再擋，不會漏掉）
 // - 環境變數 DOCS_SYNC_DISABLE=1 → 放行
 
 'use strict';
 
 const { execFileSync } = require('node:child_process');
-const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const STATE_FILE = path.join('.claude', '.docs-sync-state.json');
 const MAX_LISTED = 10;
-const MAX_HASH_BYTES = 1024 * 1024;
+const COOLDOWN_MS = 5 * 60 * 1000;
 const GIT_TIMEOUT_MS = 8000; // hook 的 timeout 是 15 秒，git 要先放棄才來得及放行
 const SPINE_DOCS = ['docs/PROGRESS.md', 'AGENTS.md', 'docs/ARCHITECTURE.md', 'docs/ROADMAP.md', 'docs/PRD.md'];
 
@@ -79,24 +80,6 @@ function committedChanges(root, fromHead, toHead) {
   return git(args, root).split('\0').map((f) => f.trim()).filter(Boolean);
 }
 
-// 大檔只取 size 與 mtime，避免 hook 在未忽略的建置產物上讀爆記憶體或逾時。
-function contentKey(full) {
-  try {
-    const st = fs.statSync(full);
-    if (!st.isFile()) return '<not-file>';
-    if (st.size > MAX_HASH_BYTES) return `size:${st.size}:mtime:${st.mtimeMs}`;
-    return crypto.createHash('sha256').update(fs.readFileSync(full)).digest('hex');
-  } catch {
-    return '<deleted>';
-  }
-}
-
-function fingerprint(root, files) {
-  const hash = crypto.createHash('sha256');
-  for (const file of files) hash.update(file).update('\0').update(contentKey(path.join(root, file))).update('\n');
-  return hash.digest('hex');
-}
-
 function readState(root) {
   try {
     return JSON.parse(fs.readFileSync(path.join(root, STATE_FILE), 'utf8'));
@@ -123,12 +106,12 @@ function buildReason(root, files) {
     '- docs/PROGRESS.md：§0 接手速覽、最後更新日期、進度符號（⬜／🔄／✅／⛔）是否反映現況',
     '- AGENTS.md：本輪是否發現新陷阱、硬性約束或指令變更',
     '- ARCHITECTURE／ROADMAP／PRD：只有在更新時機表的觸發條件成立時才改',
-    '不需要更新就回一句理由即可；同一批變更不會再被擋第二次。',
+    '不需要更新就回一句理由即可；這些檔案之後再改不會重擋，只有新的檔案才會（且至少間隔 5 分鐘）。',
   ].join('\n');
 }
 
 /** 回傳 { block: boolean, reason?: string }。純邏輯，方便測試。 */
-function decide(input, env) {
+function decide(input, env, now = Date.now()) {
   if (env.DOCS_SYNC_DISABLE === '1' || input.stop_hook_active === true) return { block: false };
 
   const cwd = input.cwd || env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -152,17 +135,22 @@ function decide(input, env) {
     .sort();
 
   if (!changed.length) {
+    writeState(root, { head, paths: [], blockedAt: state.blockedAt }); // 冷卻照算，只清路徑
+    return { block: false };
+  }
+
+  const seen = new Set(Array.isArray(state.paths) ? state.paths : []);
+  if (changed.every((f) => seen.has(f))) {
     writeState(root, { ...state, head });
     return { block: false };
   }
 
-  const fp = fingerprint(root, changed);
-  if (fp === state.fingerprint) {
-    writeState(root, { ...state, head });
-    return { block: false };
-  }
+  // 冷卻中：整份 state 不動（head 也不推進），冷卻後這些新路徑與期間的 commit 仍會被看到。
+  // elapsed < 0（時鐘倒退）不算冷卻，免得永遠不擋。
+  const elapsed = now - Date.parse(state.blockedAt);
+  if (elapsed >= 0 && elapsed < COOLDOWN_MS) return { block: false };
 
-  writeState(root, { head, fingerprint: fp, blockedAt: new Date().toISOString() });
+  writeState(root, { head, paths: [...new Set([...seen, ...changed])].sort(), blockedAt: new Date(now).toISOString() });
   return { block: true, reason: buildReason(root, changed) };
 }
 
