@@ -39,6 +39,7 @@ claude plugin update andy-init@andy-claude-kit
 | 語言 rules | `~/.claude/rules/{python,typescript,golang,rust,vue,web}/` | 擷取自上游 ECC，依副檔名自動載入；來源與差異見 `tools/UPSTREAM.md` |
 | 審查 agents | plugin 直接提供 | `andy-init:python-reviewer`、`typescript-reviewer`、`go-reviewer`、`rust-reviewer`、`database-reviewer`、`security-reviewer`；全部唯讀，只回報不改檔 |
 | 語言設定 | `~/.claude/settings.json` 的 `language` | 繁體中文 |
+| 子 agent 預設模型 | `~/.claude/settings.json` 的 `env.CLAUDE_CODE_SUBAGENT_MODEL` | `sonnet`：general-purpose 與沒寫 `model` 的 agent 用它；派工時明確傳 `model` 或 agent 定義有寫的仍優先（不設 `_FORCE`）。每次 setup 會重寫這個值，要改用別的模型請改 payload |
 | project-docs 偏好 | `~/.claude/project-docs.preferences.md` | 只在不存在時建立 |
 | LSP、claude-hud | Claude Code plugin | setup 時選裝 |
 | `/andy-init:project-docs` | plugin skill | 專案文件骨幹（AGENTS.md + PRD/ARCHITECTURE/ROADMAP/PROGRESS），並在專案裝上文件同步 Stop hook |

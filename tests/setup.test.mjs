@@ -98,11 +98,24 @@ test('settings.json 不合法時整批不寫入', () => {
   assert.ok(kinds(result, 'error').includes('settings.json'));
 });
 
-test('settings.json 既有設定保留，只改 language', () => {
+test('settings.json 既有設定保留，只改 andy-init 管的 language 與子 agent 預設模型', () => {
   const root = tmpRoot();
   fs.writeFileSync(path.join(root, 'settings.json'), JSON.stringify({ model: 'opus', language: 'English' }));
   run(root);
-  assert.deepEqual(JSON.parse(read(root, 'settings.json')), { model: 'opus', language: '繁體中文' });
+  assert.deepEqual(JSON.parse(read(root, 'settings.json')), {
+    model: 'opus',
+    language: '繁體中文',
+    env: { CLAUDE_CODE_SUBAGENT_MODEL: 'sonnet' },
+  });
+});
+
+test('settings.json 既有的 env 其他變數保留，不加 FORCE（派工明確指定 opus 仍要能覆蓋）', () => {
+  const root = tmpRoot();
+  fs.writeFileSync(path.join(root, 'settings.json'), JSON.stringify({ env: { GITHUB_TOKEN: 'x' } }));
+  run(root);
+  const env = JSON.parse(read(root, 'settings.json')).env;
+  assert.deepEqual(env, { GITHUB_TOKEN: 'x', CLAUDE_CODE_SUBAGENT_MODEL: 'sonnet' });
+  assert.equal('CLAUDE_CODE_SUBAGENT_MODEL_FORCE' in env, false);
 });
 
 test('改動使用者既有的 CLAUDE.md、settings.json 前先備份', () => {
@@ -183,6 +196,22 @@ test('subagent-mode 預設 investigate：只留調查版，標記行不寫出', 
   assert.match(text, INVESTIGATE);
   assert.doesNotMatch(text, IMPLEMENT);
   assert.doesNotMatch(text, /andy-init:(option|end-option)/);
+});
+
+// §13 的 context 規則兩種模式都要有；工作包上限只對會實作的子 agent 有意義
+const MAIN_CONTEXT = /主線 context 超過約 30 萬 token/;
+const WRITE_REPORT = /子 agent 的完整產出寫檔，回給主線只有摘要/;
+const PACKAGE_SIZE = /工作包要小到一個新 context 做得完/;
+
+test('兩種 subagent-mode 都帶主線 context 與寫檔回報規則；工作包上限只在 implement', () => {
+  for (const [mode, hasPackage] of [['investigate', false], ['implement', true]]) {
+    const root = tmpRoot();
+    run(root, { options: { 'subagent-mode': mode } });
+    const text = read(root, 'AGENTS.md');
+    assert.match(text, MAIN_CONTEXT, mode);
+    assert.match(text, WRITE_REPORT, mode);
+    (hasPackage ? assert.match : assert.doesNotMatch)(text, PACKAGE_SIZE, mode);
+  }
 });
 
 test('subagent-mode=implement：只留實作版，並記在 manifest', () => {

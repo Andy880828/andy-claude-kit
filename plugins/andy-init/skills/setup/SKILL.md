@@ -1,6 +1,6 @@
 ---
 name: setup
-description: 初始化或更新這台電腦的 Claude Code 全域環境——安裝全域 AGENTS.md（工程習慣）、CLAUDE.md 的 import 殼、語言 rules（Python/TS/JS/Go/Rust/Vue/Web）、繁體中文語言設定、project-docs 偏好檔，並選裝 LSP 與 claude-hud。Use when the user says 初始化環境、setup、新電腦、重裝 Claude、更新 andy-init、同步全域設定.
+description: 初始化或更新這台電腦的 Claude Code 全域環境——安裝全域 AGENTS.md（工程習慣）、CLAUDE.md 的 import 殼、語言 rules（Python/TS/JS/Go/Rust/Vue/Web）、繁體中文語言設定與子 agent 預設模型（Sonnet）、project-docs 偏好檔，並選裝 LSP 與 claude-hud。Use when the user says 初始化環境、setup、新電腦、重裝 Claude、更新 andy-init、同步全域設定.
 argument-hint: "[--force] [--subagent-mode=investigate|implement]"
 disable-model-invocation: true
 allowed-tools: Read AskUserQuestion Bash(node *) Bash(claude plugin *)
